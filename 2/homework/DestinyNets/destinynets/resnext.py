@@ -3,6 +3,7 @@ Based on https://arxiv.org/pdf/1611.05431.pdf.
 """
 
 import torch.nn as nn
+import torch
 import math
 
 
@@ -129,31 +130,41 @@ class ResNeXt(nn.Module):
         return x
 
 
-def resnext18():
+def resnext18(weights_path=None):
     """Constructs a ResNeXt-18 model."""
     model = ResNeXt(TwoLayeredBlock, [2, 2, 2, 2])
+    if weights_path is not None:
+        model.load_state_dict(torch.load(weights_path))
     return model
 
 
-def resnext34():
+def resnext34(weights_path=None):
     """Constructs a ResNeXt-34 model."""
     model = ResNeXt(TwoLayeredBlock, [3, 4, 6, 3])
+    if weights_path is not None:
+        model.load_state_dict(torch.load(weights_path))
     return model
 
 
-def resnext50():
+def resnext50(weights_path=None):
     """Constructs a ResNeXt-50 model."""
     model = ResNeXt(ThreeLayeredBlock, [3, 4, 6, 3])
+    if weights_path is not None:
+        model.load_state_dict(torch.load(weights_path))
     return model
 
 
-def resnext101():
+def resnext101(weights_path=None):
     """Constructs a ResNeXt-101 model."""
     model = ResNeXt(ThreeLayeredBlock, [3, 4, 23, 3])
+    if weights_path is not None:
+        model.load_state_dict(torch.load(weights_path))
     return model
 
 
-def resnext152():
+def resnext152(weights_path=None):
     """Constructs a ResNeXt-152 model."""
     model = ResNeXt(ThreeLayeredBlock, [3, 8, 36, 3])
+    if weights_path is not None:
+        model.load_state_dict(torch.load(weights_path))
     return model
