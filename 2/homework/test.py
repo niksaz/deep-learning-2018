@@ -9,14 +9,14 @@ import os.path
 
 from torch.utils.data import DataLoader
 from torch.utils.data import Sampler
-from destinynets.resnext import resnext18
+from destinynets.resnext import resnext50
 
 
-def set_random_seed():
-    torch.manual_seed(0)
-    torch.cuda.manual_seed(0)
-    np.random.seed(0)
-    random.seed(0)
+def set_random_seed(seed=1234):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
 
     torch.backends.cudnn.deterministic = True
 
@@ -53,13 +53,13 @@ class SequentialPrefixSampler(Sampler):
 def dataset_to_loader(dataset, prefix, batch_size=10):
     prefix_sampler = SequentialPrefixSampler(dataset, prefix=prefix)
     dataloader = DataLoader(dataset, batch_size=batch_size,
-                            sampler=prefix_sampler, num_workers=0)
+                            sampler=prefix_sampler)
     return dataloader
 
 
 def train_and_evaluate(train_dataloader, test_dataloader):
     criterion = nn.CrossEntropyLoss()
-    model = resnext18()
+    model = resnext50()
     learning_rate = 0.001
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -107,8 +107,8 @@ def main():
         ])
     )
 
-    train_dataloader = dataset_to_loader(train_set, prefix=500)
-    test_dataloader = dataset_to_loader(test_set, prefix=100)
+    train_dataloader = dataset_to_loader(train_set, prefix=1000)
+    test_dataloader = dataset_to_loader(test_set, prefix=500)
 
     print('len(train_dataloader) is', len(train_dataloader.sampler))
     print('len(test_dataloader) is', len(test_dataloader.sampler))

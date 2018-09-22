@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch
 import math
 
 
@@ -8,80 +9,78 @@ def conv3x3(in_planes, out_planes, stride=1):
                      padding=1, bias=False)
 
 
-class TwoLayeredBlock(nn.Module):
+class ResNeXtBlock(nn.Module):
+
+    def __init__(self, downsample):
+        super(ResNeXtBlock, self).__init__()
+        self.relu = nn.ReLU(inplace=True)
+        self.paths = []
+        self.downsample = downsample
+
+    def forward(self, x):
+        residual = x
+
+        path_sum = None
+        for path in self.paths:
+            path_out = path(x)
+            if path_sum is None:
+                path_sum = torch.zeros_like(path_out)
+            path_sum += path_out
+
+        if self.downsample is not None:
+            residual = self.downsample(x)
+
+        out = path_sum + residual
+        out = self.relu(out)
+
+        return out
+
+
+class TwoLayeredBlock(ResNeXtBlock):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None):
-        super(TwoLayeredBlock, self).__init__()
-        self.conv1 = conv3x3(inplanes, planes, stride)
-        self.bn1 = nn.BatchNorm2d(planes)
-        self.relu = nn.ReLU(inplace=True)
-        self.conv2 = conv3x3(planes, planes)
-        self.bn2 = nn.BatchNorm2d(planes)
-        self.downsample = downsample
+    def __init__(self, card, inplanes, planes, stride=1, downsample=None):
+        super(TwoLayeredBlock, self).__init__(downsample=downsample)
+        path_planes = planes // card
+        for _ in range(card):
+            path = nn.Sequential(
+                conv3x3(inplanes, path_planes, stride),
+                nn.BatchNorm2d(path_planes),
+                self.relu,
+                conv3x3(path_planes, planes),
+                nn.BatchNorm2d(planes)
+            )
+            self.paths.append(path)
         self.stride = stride
 
-    def forward(self, x):
-        residual = x
 
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-
-        out = self.conv2(out)
-        out = self.bn2(out)
-
-        if self.downsample is not None:
-            residual = self.downsample(x)
-
-        out += residual
-        out = self.relu(out)
-
-        return out
-
-
-class ThreeLayeredBlock(nn.Module):
+class ThreeLayeredBlock(ResNeXtBlock):
     expansion = 4
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None):
-        super(ThreeLayeredBlock, self).__init__()
-        self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
-                               padding=1, bias=False)
-        self.bn2 = nn.BatchNorm2d(planes)
-        self.conv3 = nn.Conv2d(planes, planes * 4, kernel_size=1, bias=False)
-        self.bn3 = nn.BatchNorm2d(planes * 4)
-        self.relu = nn.ReLU(inplace=True)
-        self.downsample = downsample
+    def __init__(self, card, inplanes, planes, stride=1, downsample=None):
+        super(ThreeLayeredBlock, self).__init__(downsample=downsample)
+        path_planes = planes // card
+        for _ in range(card):
+            path = nn.Sequential(
+                nn.Conv2d(inplanes, path_planes, kernel_size=1, bias=False),
+                nn.BatchNorm2d(path_planes),
+                self.relu,
+                nn.Conv2d(path_planes, path_planes, kernel_size=3,
+                          stride=stride, padding=1, bias=False),
+                nn.BatchNorm2d(path_planes),
+                self.relu,
+                nn.Conv2d(path_planes, planes * 4, kernel_size=1,
+                          bias=False),
+                nn.BatchNorm2d(planes * 4)
+            )
+            self.paths.append(path)
         self.stride = stride
-
-    def forward(self, x):
-        residual = x
-
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-
-        out = self.conv2(out)
-        out = self.bn2(out)
-        out = self.relu(out)
-
-        out = self.conv3(out)
-        out = self.bn3(out)
-
-        if self.downsample is not None:
-            residual = self.downsample(x)
-
-        out += residual
-        out = self.relu(out)
-
-        return out
 
 
 class ResNeXt(nn.Module):
+    C = 2
 
-    def __init__(self, block, layers, num_classes=1000):
+    def __init__(self, block, layers, num_classes=10):
         self.inplanes = 64
         super(ResNeXt, self).__init__()
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
@@ -113,10 +112,10 @@ class ResNeXt(nn.Module):
                 nn.BatchNorm2d(planes * block.expansion),
             )
 
-        layers = [block(self.inplanes, planes, stride, downsample)]
+        layers = [block(self.C, self.inplanes, planes, stride, downsample)]
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes))
+            layers.append(block(self.C, self.inplanes, planes))
 
         return nn.Sequential(*layers)
 
