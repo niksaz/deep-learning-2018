@@ -1,6 +1,31 @@
+"""
+Based on https://arxiv.org/pdf/1611.05431.pdf.
+"""
+
 import torch.nn as nn
-import torch
 import math
+
+
+class ResNeXtBlock(nn.Module):
+
+    def __init__(self, downsample):
+        super(ResNeXtBlock, self).__init__()
+        self.relu = nn.ReLU(inplace=True)
+        self.comp_block = None
+        self.downsample = downsample
+
+    def forward(self, x):
+        residual = x
+
+        out = self.comp_block(x)
+
+        if self.downsample is not None:
+            residual = self.downsample(x)
+
+        out += residual
+        out = self.relu(out)
+
+        return out
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -9,76 +34,43 @@ def conv3x3(in_planes, out_planes, stride=1):
                      padding=1, bias=False)
 
 
-class ResNeXtBlock(nn.Module):
-
-    def __init__(self, downsample):
-        super(ResNeXtBlock, self).__init__()
-        self.relu = nn.ReLU(inplace=True)
-        self.paths = []
-        self.downsample = downsample
-
-    def forward(self, x):
-        residual = x
-
-        path_sum = None
-        for path in self.paths:
-            path_out = path(x)
-            if path_sum is None:
-                path_sum = torch.zeros_like(path_out)
-            path_sum += path_out
-
-        if self.downsample is not None:
-            residual = self.downsample(x)
-
-        out = path_sum + residual
-        out = self.relu(out)
-
-        return out
-
-
 class TwoLayeredBlock(ResNeXtBlock):
     expansion = 1
 
     def __init__(self, card, inplanes, planes, stride=1, downsample=None):
-        super(TwoLayeredBlock, self).__init__(downsample=downsample)
-        path_planes = planes // card
-        for _ in range(card):
-            path = nn.Sequential(
-                conv3x3(inplanes, path_planes, stride),
-                nn.BatchNorm2d(path_planes),
-                self.relu,
-                conv3x3(path_planes, planes),
-                nn.BatchNorm2d(planes)
-            )
-            self.paths.append(path)
-        self.stride = stride
+        super(TwoLayeredBlock, self).__init__(downsample)
+        # For two layered block it is just wider convolutions.
+        self.comp_block = nn.Sequential(
+            conv3x3(inplanes, planes * 2, stride),
+            nn.BatchNorm2d(planes * 2),
+            nn.ReLU(inplace=True),
+            conv3x3(planes * 2, planes),
+            nn.BatchNorm2d(planes),
+        )
 
 
 class ThreeLayeredBlock(ResNeXtBlock):
     expansion = 4
 
     def __init__(self, card, inplanes, planes, stride=1, downsample=None):
-        super(ThreeLayeredBlock, self).__init__(downsample=downsample)
-        path_planes = planes // card
-        for _ in range(card):
-            path = nn.Sequential(
-                nn.Conv2d(inplanes, path_planes, kernel_size=1, bias=False),
-                nn.BatchNorm2d(path_planes),
-                self.relu,
-                nn.Conv2d(path_planes, path_planes, kernel_size=3,
-                          stride=stride, padding=1, bias=False),
-                nn.BatchNorm2d(path_planes),
-                self.relu,
-                nn.Conv2d(path_planes, planes * 4, kernel_size=1,
-                          bias=False),
-                nn.BatchNorm2d(planes * 4)
-            )
-            self.paths.append(path)
-        self.stride = stride
+        super(ThreeLayeredBlock, self).__init__(downsample)
+        # For three layered block it is wider convolutions and they are also
+        # grouped on the second step.
+        self.comp_block = nn.Sequential(
+            nn.Conv2d(inplanes, planes*2, kernel_size=1, bias=False),
+            nn.BatchNorm2d(planes*2),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(planes*2, planes*2, kernel_size=3, stride=stride,
+                      padding=1, bias=False, groups=card),
+            nn.BatchNorm2d(planes*2),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(planes*2, planes * 4, kernel_size=1, bias=False),
+            nn.BatchNorm2d(planes * 4),
+        )
 
 
 class ResNeXt(nn.Module):
-    C = 2
+    card = 32
 
     def __init__(self, block, layers, num_classes=10):
         self.inplanes = 64
@@ -112,10 +104,10 @@ class ResNeXt(nn.Module):
                 nn.BatchNorm2d(planes * block.expansion),
             )
 
-        layers = [block(self.C, self.inplanes, planes, stride, downsample)]
+        layers = [block(self.card, self.inplanes, planes, stride, downsample)]
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
-            layers.append(block(self.C, self.inplanes, planes))
+            layers.append(block(self.card, self.inplanes, planes))
 
         return nn.Sequential(*layers)
 

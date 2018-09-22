@@ -9,7 +9,7 @@ import os.path
 
 from torch.utils.data import DataLoader
 from torch.utils.data import Sampler
-from destinynets.resnext import resnext50
+from destinynets.resnext import resnext18
 
 
 def set_random_seed(seed=1234):
@@ -59,7 +59,7 @@ def dataset_to_loader(dataset, prefix, batch_size=10):
 
 def train_and_evaluate(train_dataloader, test_dataloader):
     criterion = nn.CrossEntropyLoss()
-    model = resnext50()
+    model = resnext18()
     learning_rate = 0.001
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
