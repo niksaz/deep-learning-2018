@@ -1,10 +1,15 @@
-import destiny_nets as nets
 import torchvision.datasets as datasets
 import torchvision.transforms as transforms
+import torch.nn as nn
+import torch.optim as optim
 import numpy as np
 import torch
 import random
 import os.path
+
+from torch.utils.data import DataLoader
+from torch.utils.data import Sampler
+from destinynets.resnext import resnext18
 
 
 def set_random_seed():
@@ -23,37 +28,69 @@ def create_root_for_data():
     return root
 
 
-def compute_train_mean_std(root):
-    # TODO: Remove!
-    mean = 0.2860410809516907
-    std = 0.3530243933200836
-    return mean, std
-
-    train_set = datasets.FashionMNIST(root=root, train=True,
-                                      transform=transforms.ToTensor(),
-                                      download=True)
-
-    pixel_sum = torch.zeros(1)
-    pixel_num = 0
-    for image, _ in train_set:
-        pixel_sum += image.sum()
-        pixel_num += image.numel()
-    mean = pixel_sum / pixel_num
-
-    dev_from_mean = torch.zeros(1)
-    for image, _ in train_set:
-        dev_from_mean += ((image - mean) ** 2).sum()
-    std = torch.sqrt(dev_from_mean / pixel_num)
-
-    return mean.item(), std.item()
-
-
 def load_datasets(root, transform):
-    train_set = datasets.FashionMNIST(root=root, train=True,
-                                      transform=transform, download=True)
-    test_set = datasets.FashionMNIST(root=root, train=False,
-                                     transform=transform, download=True)
+    train_set = datasets.STL10(root=root, split='train', transform=transform,
+                               download=True)
+    test_set = datasets.STL10(root=root, split='test', transform=transform,
+                              download=True)
+
     return train_set, test_set
+
+
+class SequentialPrefixSampler(Sampler):
+
+    def __init__(self, data_source, prefix):
+        super(SequentialPrefixSampler, self).__init__(data_source)
+        self.prefix = min(prefix, len(data_source))
+
+    def __iter__(self):
+        return iter(range(self.prefix))
+
+    def __len__(self):
+        return self.prefix
+
+
+def dataset_to_loader(dataset, prefix, batch_size=10):
+    prefix_sampler = SequentialPrefixSampler(dataset, prefix=prefix)
+    dataloader = DataLoader(dataset, batch_size=batch_size,
+                            sampler=prefix_sampler, num_workers=0)
+    return dataloader
+
+
+def train_and_evaluate(train_dataloader, test_dataloader):
+    criterion = nn.CrossEntropyLoss()
+    model = resnext18()
+    learning_rate = 0.001
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+    num_epochs = 5
+
+    for epoch in range(num_epochs):
+        model.train()
+
+        for images, labels in train_dataloader:
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        model.eval()
+
+        correct = 0
+        for images, labels in test_dataloader:
+            outputs = model(images)
+
+            _, predicted_labels = torch.max(outputs.data, dim=1)
+            correct += (predicted_labels == labels).sum()
+
+        accuracy = 100 * correct / len(test_dataloader.sampler)
+
+        print('After epoch', epoch)
+        print('Loss =', loss.data.item())
+        print('Accuracy =', accuracy.item())
+        print()
 
 
 def main():
@@ -63,21 +100,21 @@ def main():
     print('Data root is', root)
     print()
 
-    mean, std = compute_train_mean_std(root)
-    print('Mean is =', mean)
-    print('Std is =', std)
-    print()
-
     train_set, test_set = load_datasets(
         root,
         transform=transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize(mean=[mean], std=[std])
         ])
     )
-    print('train_set len is', len(train_set))
-    print('test_set len is', len(test_set))
+
+    train_dataloader = dataset_to_loader(train_set, prefix=500)
+    test_dataloader = dataset_to_loader(test_set, prefix=100)
+
+    print('len(train_dataloader) is', len(train_dataloader.sampler))
+    print('len(test_dataloader) is', len(test_dataloader.sampler))
     print()
+
+    train_and_evaluate(train_dataloader, test_dataloader)
 
 
 if __name__ == "__main__":
