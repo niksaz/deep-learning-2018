@@ -62,7 +62,7 @@ class DCGANTrainer:
                 target = torch.ones(real.size()[0], device=self.device)
 
                 output = self.net_d(real)
-                err_d_real = criterion(output, target)
+                err_d_real = criterion(output, target.reshape(output.shape))
 
                 noise = torch.randn(real.size()[0], self.latent_size, 1, 1, device=self.device)
                 fake = self.net_g(noise)
@@ -76,7 +76,7 @@ class DCGANTrainer:
 
                 target = torch.zeros(real.size()[0], device=self.device)
                 output = self.net_d(fake.detach())
-                err_d_fake = criterion(output, target)
+                err_d_fake = criterion(output, target.reshape(output.shape))
 
                 err_d = err_d_real + err_d_fake
                 err_d.backward()
@@ -85,7 +85,7 @@ class DCGANTrainer:
                 self.net_g.zero_grad()
                 target = torch.ones(real.size()[0], device=self.device)
                 output = self.net_d(fake)
-                err_g = criterion(output, target)
+                err_g = criterion(output, target.reshape(output.shape))
                 err_g.backward()
                 self.optimizer_g.step()
 
