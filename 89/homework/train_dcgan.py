@@ -45,7 +45,7 @@ def main():
             logging.StreamHandler()],
         level=logging.INFO)
 
-    transform = transforms.Compose([transforms.Scale(32), transforms.ToTensor(),
+    transform = transforms.Compose([transforms.Resize(32), transforms.ToTensor(),
                                     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
     dataset = datasets.CIFAR10(root=config.data_root, download=True,
                                transform=transform)
