@@ -50,7 +50,7 @@ def sampleFake(netG, nz, sampleSize, batchSize, saveFolder):
 def sampleTrue(dataset, imageSize, dataroot, sampleSize, batchSize, saveFolder):
     saveFolder = os.path.join(saveFolder, '0')
 
-    workers = 4
+    workers = 0
     if dataset in ['imagenet', 'folder', 'lfw']:
         # folder dataset
         dataset = dset.ImageFolder(root=dataroot,
@@ -113,7 +113,7 @@ def sampleTrue(dataset, imageSize, dataroot, sampleSize, batchSize, saveFolder):
 
 
 class ConvNetFeatureSaver(object):
-    def __init__(self, model='resnet34', workers=4, batchSize=64):
+    def __init__(self, model='resnet34', workers=0, batchSize=64):
         '''
         model: inception_v3, vgg13, vgg16, vgg19, resnet18, resnet34,
                resnet50, resnet101, or resnet152
