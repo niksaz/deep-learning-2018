@@ -36,6 +36,7 @@ def get_config():
 
 def main():
     config = get_config()
+    os.makedirs(config.log_root)
     logging.basicConfig(
         format='%(asctime)s | %(message)s',
         handlers=[
