@@ -36,7 +36,7 @@ def get_config():
 
 def main():
     config = get_config()
-    os.makedirs(config.log_root)
+    os.makedirs(config.log_root, exist_ok=True)
     logging.basicConfig(
         format='%(asctime)s | %(message)s',
         handlers=[
@@ -50,7 +50,7 @@ def main():
     dataset = datasets.CIFAR10(root=config.data_root, download=True,
                                transform=transform)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=config.batch_size, shuffle=True,
-                                             num_workers=4, pin_memory=True)
+                                             num_workers=0, pin_memory=True)
 
     discriminator, generator = DCDiscriminator(), DCGenerator(config.latent_size)
 
