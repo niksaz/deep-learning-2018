@@ -15,7 +15,7 @@ from homework import metric
 class DCGANTrainer:
 
     def __init__(self, discriminator, generator, optimizer_d, optimizer_g, latent_size=100,
-                 device='cuda', metrics_dir='metrics', save_root='ckpt', log_dir=None):
+                 device='cpu', metrics_dir='metrics', save_root='ckpt', log_dir=None):
         self.net_g = generator
         self.net_d = discriminator
         self.optimizer_d = optimizer_d
